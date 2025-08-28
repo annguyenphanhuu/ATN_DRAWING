@@ -1,0 +1,12 @@
+# For the PyTorch libraries below, it is highly recommended to install them using the specific commands
+# provided in the guide, as they may depend on your system's CUDA version.
+# The command 'pip install -r requirements.txt' may not work correctly for these packages.
+
+numpy
+torch
+torchvision
+torchaudio
+torch_geometric
+torch_cluster
+scipy
+scikit-learn
