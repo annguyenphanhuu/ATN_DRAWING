@@ -303,24 +303,3 @@ if __name__ == "__main__":
         else:
             print(f"  Edge feature dimensions: 0 (no edges in first sample)")
 
-    # Print some statistics
-    if prepared_data:
-        total_nodes = sum(sample['num_nodes'] for sample in prepared_data)
-        total_edges = sum(len(sample['edge_index']) for sample in prepared_data)
-        total_dim_lines = sum(len(sample['dimension_lines']) for sample in prepared_data)
-
-        print(f"Statistics:")
-        print(f"  Total nodes: {total_nodes}")
-        print(f"  Total graph edges: {total_edges}")
-        print(f"  Total dimension lines: {total_dim_lines}")
-        print(f"  Average nodes per view: {total_nodes / len(prepared_data):.2f}")
-        print(f"  Average dimension lines per view: {total_dim_lines / len(prepared_data):.2f}")
-
-        # Sample feature dimensions
-        sample = prepared_data[0]
-        print(f"  Node feature dimensions: {len(sample['node_features'][0])}")
-        if sample['edge_features']:
-            print(f"  Edge feature dimensions: {len(sample['edge_features'][0])}")
-        else:
-            print(f"  Edge feature dimensions: 0 (no edges in first sample)")
-

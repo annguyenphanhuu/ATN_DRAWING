@@ -70,13 +70,26 @@ class AdvancedDimensionDataset(Dataset):
         }
 
 def collate_fn(batch):
-    """Custom collate function for handling variable-sized graphs."""
+    """Custom collate function that correctly batches graph data and metadata."""
     batch = [item for item in batch if item is not None]
     if not batch:
         return None
 
-    # Since we're processing one graph at a time, just return the first item
-    return batch[0] if len(batch) == 1 else batch
+    # If batch size is 1, the logic is simple
+    if len(batch) == 1:
+        # Still wrap strings in a list to be consistent
+        item = batch[0]
+        item['drawing_id'] = [item['drawing_id']]
+        item['view_name'] = [item['view_name']]
+        return item
+
+    # For batch_size > 1, we need to handle things carefully
+    # This is a simplified collate for this project, assuming batch_size=1 for evaluation
+    # A more robust implementation would use torch_geometric.data.Batch
+
+    # For now, we will just return a list of samples if batch size > 1
+    # and the evaluation loop will handle it.
+    return batch
 
 def evaluate_model(model, data_loader, criterion, device):
     """Comprehensive model evaluation with multiple metrics."""
