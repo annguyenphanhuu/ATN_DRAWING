@@ -224,6 +224,17 @@ def visualize_single_sample(model, batch, device, save_path=None, json_path=None
         print(f"   False Positives: {false_positives}")
         print(f"   F1 Score: {f1:.4f}")
 
+        # Create prediction results dictionary
+        prediction_results = {
+            'nodes': len(node_pos_np),
+            'true_dimension_lines': int(np.sum(positive_mask)),
+            'predicted_dimension_lines': int(np.sum(predicted_mask)),
+            'true_positives': int(true_positives),
+            'false_positives': int(false_positives),
+            'f1_score': float(f1),
+            'dim_client_output': dim_client_output
+        }
+
         return prediction_results
 
 def test_multiple_samples(num_samples=5):
@@ -266,7 +277,7 @@ def test_multiple_samples(num_samples=5):
         save_path = f'{base_path}_prediction.png'
         json_path = f'{base_path}_prediction.json'
 
-        visualize_single_sample(model, batch, device, sample_count, save_path, json_path)
+        visualize_single_sample(model, batch, device, save_path, json_path)
         sample_count += 1
     
     print(f"\n✅ Testing complete! Check 'test_results/' folder for visualizations.")

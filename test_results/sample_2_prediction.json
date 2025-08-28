@@ -1,0 +1,71 @@
+[
+  {
+    "ViewName": "Drawing View3",
+    "Lines": [
+      {
+        "StartPoint": {
+          "X": 1.0,
+          "Y": 1.0
+        },
+        "EndPoint": {
+          "X": 1.0,
+          "Y": 0.06802725046873093
+        },
+        "StartPointOrigin": null,
+        "EndPointOrigin": null,
+        "Width": 0.0,
+        "Height": 0.0,
+        "WidthOrigin": 0.0,
+        "HeightOrigin": 0.0
+      },
+      {
+        "StartPoint": {
+          "X": 1.0,
+          "Y": 1.0
+        },
+        "EndPoint": {
+          "X": 1.0,
+          "Y": 0.0
+        },
+        "StartPointOrigin": null,
+        "EndPointOrigin": null,
+        "Width": 0.0,
+        "Height": 0.0,
+        "WidthOrigin": 0.0,
+        "HeightOrigin": 0.0
+      },
+      {
+        "StartPoint": {
+          "X": 1.0,
+          "Y": 1.0
+        },
+        "EndPoint": {
+          "X": 1.0,
+          "Y": 0.9319727420806885
+        },
+        "StartPointOrigin": null,
+        "EndPointOrigin": null,
+        "Width": 0.0,
+        "Height": 0.0,
+        "WidthOrigin": 0.0,
+        "HeightOrigin": 0.0
+      },
+      {
+        "StartPoint": {
+          "X": 1.0,
+          "Y": 0.0
+        },
+        "EndPoint": {
+          "X": 1.0,
+          "Y": 0.9319727420806885
+        },
+        "StartPointOrigin": null,
+        "EndPointOrigin": null,
+        "Width": 0.0,
+        "Height": 0.0,
+        "WidthOrigin": 0.0,
+        "HeightOrigin": 0.0
+      }
+    ]
+  }
+]
