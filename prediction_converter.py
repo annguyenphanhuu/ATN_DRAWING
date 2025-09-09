@@ -63,52 +63,52 @@ class PredictionConverter:
     def load_original_coordinates(self, drawing_id: str, view_name: str) -> Optional[Dict]:
         """
         Load original coordinates from the source data files.
-        
+
         Args:
             drawing_id: ID of the drawing
             view_name: Name of the view
-            
+
         Returns:
-            Dictionary containing original coordinates and normalization parameters
+            Dictionary containing original coordinates, normalization parameters, and view metadata
         """
         # Look for the original data file
         data_dir = 'data/output'
         drawing_path = os.path.join(data_dir, drawing_id)
-        
+
         if not os.path.exists(drawing_path):
             print(f"Warning: Drawing path {drawing_path} not found")
             return None
-        
+
         # Find DimAll file for this drawing
         dim_all_file = None
         for file in os.listdir(drawing_path):
             if file.endswith('_DimAll.json'):
                 dim_all_file = os.path.join(drawing_path, file)
                 break
-        
+
         if not dim_all_file:
             print(f"Warning: DimAll file not found for {drawing_id}")
             return None
-        
+
         try:
             with open(dim_all_file, 'r') as f:
                 dim_all_data = json.load(f)
-            
+
             # Find the matching view
             target_view = None
             for view in dim_all_data:
                 if view.get('ViewName') == view_name:
                     target_view = view
                     break
-            
+
             if not target_view:
                 print(f"Warning: View {view_name} not found in {drawing_id}")
                 return None
-            
+
             # Extract original points and calculate normalization parameters
             lines = target_view.get('Lines', [])
             all_points = set()
-            
+
             for line in lines:
                 start = line.get("StartPointOrigin")
                 end = line.get("EndPointOrigin")
@@ -116,28 +116,32 @@ class PredictionConverter:
                     all_points.add(tuple(start.values()))
                 if end:
                     all_points.add(tuple(end.values()))
-            
+
             if len(all_points) < 2:
                 return None
-            
+
             # Sort points to match the order used in data preparation
             point_cloud_coords = sorted(list(all_points))
             coords_array = np.array(point_cloud_coords, dtype=np.float32)
-            
+
             # Calculate normalization parameters
             min_coords = np.min(coords_array, axis=0)
             max_coords = np.max(coords_array, axis=0)
             range_coords = max_coords - min_coords
             range_coords[range_coords == 0] = 1
-            
+
             return {
                 'original_coords': point_cloud_coords,
                 'min_coords': min_coords,
                 'max_coords': max_coords,
                 'range_coords': range_coords,
-                'point_to_index': {point: i for i, point in enumerate(point_cloud_coords)}
+                'point_to_index': {point: i for i, point in enumerate(point_cloud_coords)},
+                'view_angle_rad': target_view.get('ViewAngleRad', 0.0),
+                'view_position': target_view.get('ViewPosition', {'X': 0.0, 'Y': 0.0}),
+                'scale01': target_view.get('Scale01', 1.0),
+                'scale02': target_view.get('Scale02', 1.0)
             }
-            
+
         except Exception as e:
             print(f"Error loading original coordinates: {e}")
             return None
@@ -166,18 +170,18 @@ class PredictionConverter:
     def convert_prediction_to_original_format(self, prediction_input: any,
                                             output_path: str = None,
                                             drawing_id: Optional[str] = None,
-                                            view_name: Optional[str] = None) -> Dict:
+                                            view_name: Optional[str] = None) -> Optional[List[Dict]]:
         """
-        Convert prediction data back to the original DimClient format.
+        Convert prediction data for one or more views back to the original DimClient format.
 
         Args:
-            prediction_input: Prediction data, can be a file path (str) or in-memory data (list/dict).
-            output_path: Optional path to save the converted result.
-            drawing_id: The ID of the drawing.
-            view_name: The name of the view.
+            prediction_input: Prediction data, can be a file path (str) or in-memory data (list of view dicts).
+            output_path: Optional path to save the consolidated converted result.
+            drawing_id: The ID of the drawing, required for processing.
+            view_name: (Optional) The name of a specific view if only one is processed.
 
         Returns:
-            A dictionary in the original DimClient format.
+            A list of dictionaries, each representing a converted view in the original format.
         """
         try:
             if isinstance(prediction_input, str):
@@ -185,82 +189,74 @@ class PredictionConverter:
                     prediction_data = json.load(f)
             else:
                 prediction_data = prediction_input
-            
-            # Extract the first (and usually only) view from prediction
-            if isinstance(prediction_data, list) and len(prediction_data) > 0:
-                view_data = prediction_data[0]
-            else:
-                view_data = prediction_data
-            
-            predicted_lines = view_data.get('Lines', [])
-
-            # Prioritize passed arguments for drawing_id and view_name
-            if not drawing_id or not view_name:
-                # Fallback to extracting from path if not provided
-                extracted_drawing_id, extracted_view_name = self._extract_drawing_info_from_path(prediction_json_path)
-                drawing_id = drawing_id or extracted_drawing_id
-                view_name = view_name or extracted_view_name
-
-            # Get view_name from data if still not available
-            view_name = view_name or view_data.get('ViewName', 'unknown')
 
             if not drawing_id:
-                print("Warning: Could not determine drawing_id. Using 'unknown'")
-                drawing_id = 'unknown'
-            
-            # Load original coordinates and normalization parameters
-            norm_params = self.load_original_coordinates(drawing_id, view_name)
-            
-            if not norm_params:
-                print("Warning: Could not load original coordinates. Returning prediction as-is.")
-                return view_data
-            
-            # Convert predicted lines back to original format
-            converted_lines = []
-            for line in predicted_lines:
-                # The coordinates in prediction are already in normalized space [0,1]
-                # We need to map them back to original coordinate space
-                start_point = (line['StartPoint']['X'], line['StartPoint']['Y'])
-                end_point = (line['EndPoint']['X'], line['EndPoint']['Y'])
+                print("Error: `drawing_id` is required for conversion.")
+                return None
 
-                # Denormalize coordinates from [0,1] space back to original space
-                denormalized_coords = self.denormalize_coordinates(
-                    [start_point, end_point], norm_params
-                )
+            # Ensure prediction_data is a list for consistent processing
+            if not isinstance(prediction_data, list):
+                prediction_data = [prediction_data]
 
-                original_start = denormalized_coords[0]
-                original_end = denormalized_coords[1]
-                
-                # Create line in original format
-                converted_line = {
-                    "StartPoint": {"X": float(original_start[0]), "Y": float(original_start[1])},
-                    "EndPoint": {"X": float(original_end[0]), "Y": float(original_end[1])},
-                    "StartPointOrigin": {"X": float(original_start[0]), "Y": float(original_start[1])},
-                    "EndPointOrigin": {"X": float(original_end[0]), "Y": float(original_end[1])},
-                    "Width": float(original_end[0] - original_start[0]),
-                    "Height": float(original_end[1] - original_start[1]),
-                    "WidthOrigin": float(original_end[0] - original_start[0]),
-                    "HeightOrigin": float(original_end[1] - original_start[1])
+            all_converted_views = []
+
+            for view_data in prediction_data:
+                current_view_name = view_data.get('ViewName')
+                if not current_view_name:
+                    print(f"Warning: Skipping a view in drawing {drawing_id} because it has no 'ViewName'.")
+                    continue
+
+                predicted_lines = view_data.get('Lines', [])
+
+                # Load original coordinates and normalization parameters for the current view
+                norm_params = self.load_original_coordinates(drawing_id, current_view_name)
+
+                if not norm_params:
+                    print(f"Warning: Could not load original coordinates for view '{current_view_name}'. Skipping.")
+                    continue
+
+                converted_lines = []
+                for line in predicted_lines:
+                    start_point = (line['StartPoint']['X'], line['StartPoint']['Y'])
+                    end_point = (line['EndPoint']['X'], line['EndPoint']['Y'])
+
+                    denormalized_coords = self.denormalize_coordinates([start_point, end_point], norm_params)
+                    original_start, original_end = denormalized_coords[0], denormalized_coords[1]
+
+                    converted_line = {
+                        "StartPoint": {"X": float(original_start[0]), "Y": float(original_start[1])},
+                        "EndPoint": {"X": float(original_end[0]), "Y": float(original_end[1])},
+                        "StartPointOrigin": {"X": float(original_start[0]), "Y": float(original_start[1])},
+                        "EndPointOrigin": {"X": float(original_end[0]), "Y": float(original_end[1])},
+                        "Width": float(original_end[0] - original_start[0]),
+                        "Height": float(original_end[1] - original_start[1]),
+                        "WidthOrigin": float(original_end[0] - original_start[0]),
+                        "HeightOrigin": float(original_end[1] - original_start[1])
+                    }
+                    converted_lines.append(converted_line)
+
+                # Create final result for the current view with ViewAngleRad and other metadata
+                converted_view = {
+                    "ViewName": current_view_name,
+                    "ViewAngleRad": norm_params.get('view_angle_rad', 0.0),
+                    "ViewPosition": norm_params.get('view_position', {'X': 0.0, 'Y': 0.0}),
+                    "Scale01": norm_params.get('scale01', 1.0),
+                    "Scale02": norm_params.get('scale02', 1.0),
+                    "Lines": converted_lines
                 }
-                converted_lines.append(converted_line)
-            
-            # Create final result in original format
-            result = {
-                "ViewName": view_name,
-                "Lines": converted_lines
-            }
-            
-            # Save to file if output path provided
-            if output_path:
-                # Save as a list to match original DimClient format
+                all_converted_views.append(converted_view)
+
+            # Save the consolidated list of all views to a single file
+            if output_path and all_converted_views:
                 with open(output_path, 'w', encoding='utf-8') as f:
-                    json.dump([result], f, indent=2, ensure_ascii=False)
-                print(f"✅ Converted prediction saved to {output_path}")
-            
-            return result
-            
+                    json.dump(all_converted_views, f, indent=2, ensure_ascii=False)
+                # This message is now printed in the main script, so we can avoid redundancy
+                # print(f"✅ Consolidated converted prediction saved to {output_path}")
+
+            return all_converted_views
+
         except Exception as e:
-            print(f"Error converting prediction: {e}")
+            print(f"Error during prediction conversion for drawing {drawing_id}: {e}")
             return None
     
     def _extract_drawing_info_from_path(self, file_path: str) -> tuple[Optional[str], Optional[str]]:

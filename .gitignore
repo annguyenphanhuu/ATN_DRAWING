@@ -217,3 +217,4 @@ secrets.json
 # Specific to this project
 data/
 evaluation_results/
+evaluation_results.zip
